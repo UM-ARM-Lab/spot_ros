@@ -68,7 +68,7 @@ from spot_msgs.srv import HandPose, HandPoseResponse, HandPoseRequest
 from spot_msgs.srv import Grasp3d, Grasp3dRequest, Grasp3dResponse
 
 from .ros_helpers import *
-from spot_wrapper.wrapper import SpotWrapper
+from .spot_wrapper import SpotWrapper
 
 import actionlib
 import logging
@@ -157,16 +157,11 @@ class SpotROS:
             self.odom_twist_pub.publish(twist_odom_msg)
 
             # Odom #
-            use_vision = self.mode_parent_odom_tf == "vision"
-            odom_msg = GetOdomFromState(
-                state,
-                self.spot_wrapper,
-                use_vision=use_vision,
-            )
+            if self.mode_parent_odom_tf == "vision":
+                odom_msg = GetOdomFromState(state, self.spot_wrapper, use_vision=True)
+            else:
+                odom_msg = GetOdomFromState(state, self.spot_wrapper, use_vision=False)
             self.odom_pub.publish(odom_msg)
-
-            odom_corrected_msg = get_corrected_odom(odom_msg)
-            self.odom_corrected_pub.publish(odom_corrected_msg)
 
             # Feet #
             foot_array_msg = GetFeetFromState(state, self.spot_wrapper)
@@ -1442,8 +1437,7 @@ class SpotROS:
                 )
 
     def main(self):
-        """Main function for the SpotROS class. Gets config from ROS and initializes the wrapper. Holds lease from
-        wrapper and updates all async tasks at the ROS rate"""
+        """Main function for the SpotROS class.  Gets config from ROS and initializes the wrapper.  Holds lease from wrapper and updates all async tasks at the ROS rate"""
         rospy.init_node("spot_ros", anonymous=True)
 
         self.rates = rospy.get_param("~rates", {})
@@ -1462,17 +1456,13 @@ class SpotROS:
                 )
 
         rate = rospy.Rate(loop_rate)
-        self.robot_name = rospy.get_param("~robot_name", "spot")
         self.username = rospy.get_param("~username", "default_value")
         self.password = rospy.get_param("~password", "default_value")
         self.hostname = rospy.get_param("~hostname", "default_value")
         self.motion_deadzone = rospy.get_param("~deadzone", 0.05)
-        self.start_estop = rospy.get_param("~start_estop", True)
         self.estop_timeout = rospy.get_param("~estop_timeout", 9.0)
         self.autonomy_enabled = rospy.get_param("~autonomy_enabled", True)
         self.allow_motion = rospy.get_param("~allow_motion", True)
-        self.use_take_lease = rospy.get_param("~use_take_lease", False)
-        self.get_lease_on_action = rospy.get_param("~get_lease_on_action", False)
         self.is_charging = False
 
         self.tf_buffer = tf2_ros.Buffer()
@@ -1508,17 +1498,13 @@ class SpotROS:
 
         rospy.loginfo("Starting ROS driver for Spot")
         self.spot_wrapper = SpotWrapper(
-            username=self.username,
-            password=self.password,
-            hostname=self.hostname,
-            robot_name=self.robot_name,
-            logger=self.logger,
-            start_estop=self.start_estop,
-            estop_timeout=self.estop_timeout,
-            rates=self.rates,
-            callbacks=self.callbacks,
-            use_take_lease=self.use_take_lease,
-            get_lease_on_action=self.get_lease_on_action,
+            self.username,
+            self.password,
+            self.hostname,
+            self.logger,
+            self.estop_timeout,
+            self.rates,
+            self.callbacks,
         )
 
         if not self.spot_wrapper.is_valid:
@@ -1570,6 +1556,14 @@ class SpotROS:
         self.point_cloud_pub = rospy.Publisher(
             "lidar/points", PointCloud2, queue_size=10
         )
+        self.camera_pub_to_async_task_mapping = {
+            self.frontleft_image_pub: "front_image",
+            self.frontright_image_pub: "front_image",
+            self.back_image_pub: "rear_image",
+            self.right_image_pub: "side_image",
+            self.left_image_pub: "side_image",
+            self.hand_image_color_pub: "hand_image",
+        }
 
         # Image Camera Info #
         self.back_image_info_pub = rospy.Publisher(
@@ -1623,29 +1617,6 @@ class SpotROS:
             "depth/frontright/depth_in_visual/camera_info", CameraInfo, queue_size=10
         )
 
-        self.camera_pub_to_async_task_mapping = {
-            self.frontleft_image_pub: "front_image",
-            self.frontleft_depth_pub: "front_image",
-            self.frontleft_image_info_pub: "front_image",
-            self.frontright_image_pub: "front_image",
-            self.frontright_depth_pub: "front_image",
-            self.frontright_image_info_pub: "front_image",
-            self.back_image_pub: "rear_image",
-            self.back_depth_pub: "rear_image",
-            self.back_image_info_pub: "rear_image",
-            self.right_image_pub: "side_image",
-            self.right_depth_pub: "side_image",
-            self.right_image_info_pub: "side_image",
-            self.left_image_pub: "side_image",
-            self.left_depth_pub: "side_image",
-            self.left_image_info_pub: "side_image",
-            self.hand_image_color_pub: "hand_image",
-            self.hand_image_mono_pub: "hand_image",
-            self.hand_image_mono_info_pub: "hand_image",
-            self.hand_depth_pub: "hand_image",
-            self.hand_depth_in_hand_color_pub: "hand_image",
-        }
-
         # Status Publishers #
         self.joint_state_pub = rospy.Publisher(
             "joint_states", JointState, queue_size=10
@@ -1658,9 +1629,6 @@ class SpotROS:
             "odometry/twist", TwistWithCovarianceStamped, queue_size=10
         )
         self.odom_pub = rospy.Publisher("odometry", Odometry, queue_size=10)
-        self.odom_corrected_pub = rospy.Publisher(
-            "odometry_corrected", Odometry, queue_size=10
-        )
         self.feet_pub = rospy.Publisher("status/feet", FootStateArray, queue_size=10)
         self.estop_pub = rospy.Publisher("status/estop", EStopStateArray, queue_size=10)
         self.wifi_pub = rospy.Publisher("status/wifi", WiFiState, queue_size=10)
