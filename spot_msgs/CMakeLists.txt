@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 add_message_files(
   FILES
+  JointTarget.msg
   BatteryStateArray.msg
   BehaviorFault.msg
   EStopStateArray.msg

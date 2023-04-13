@@ -1207,48 +1207,52 @@ class SpotWrapper:
         # Joint6: 0.0 Gripper is not rolled, positive is ccw
         # RANGE: -2.87 -> 2.87
         # Values after unstow are: [0.0, -0.9, 1.8, 0.0, -0.9, 0.0]
-        if abs(joint_targets[0]) > 3.14:
-            msg = "Joint 1 has to be between -3.14 and 3.14"
-            self._logger.warn(msg)
-            return False, msg
-        elif joint_targets[1] > 0.4 or joint_targets[1] < -3.13:
-            msg = "Joint 2 has to be between -3.13 and 0.4"
-            self._logger.warn(msg)
-            return False, msg
-        elif joint_targets[2] > 3.14 or joint_targets[2] < 0.0:
-            msg = "Joint 3 has to be between 0.0 and 3.14"
-            self._logger.warn(msg)
-            return False, msg
-        elif abs(joint_targets[3]) > 2.79253:
-            msg = "Joint 4 has to be between -2.79253 and 2.79253"
-            self._logger.warn(msg)
-            return False, msg
-        elif abs(joint_targets[4]) > 1.8326:
-            msg = "Joint 5 has to be between -1.8326 and 1.8326"
-            self._logger.warn(msg)
-            return False, msg
-        elif abs(joint_targets[5]) > 2.87:
-            msg = "Joint 6 has to be between -2.87 and 2.87"
-            self._logger.warn(msg)
-            return False, msg
+        for idx, joint_target in enumerate(joint_targets):
+            if abs(joint_target[0]) > 3.14:
+                msg = "joint 1 of trajectory point {} has to be between -3.14 and 3.14".format(idx)
+                self._logger.warn(msg)
+                return False, msg
+            elif joint_target[1] > 0.4 or joint_target[1] < -3.13:
+                msg = "joint 2 of trajectory point {} has to be between -3.13 and 0.4".format(idx)
+                self._logger.warn(msg)
+                return False, msg
+            elif joint_target[2] > 3.14 or joint_target[2] < 0.0:
+                msg = "joint 3 of trajectory point {} has to be between 0.0 and 3.14".format(idx)
+                self._logger.warn(msg)
+                return False, msg
+            elif abs(joint_target[3]) > 2.79253:
+                msg = "joint 4 of trajectory point {} has to be between -2.79253 and 2.79253".format(idx)
+                self._logger.warn(msg)
+                return False, msg
+            elif abs(joint_target[4]) > 1.8326:
+                msg = "joint 5 of trajectory point {} has to be between -1.8326 and 1.8326".format(idx)
+                self._logger.warn(msg)
+                return False, msg
+            elif abs(joint_target[5]) > 2.87:
+                msg = "joint 6 of trajectory point {} has to be between -2.87 and 2.87".format(idx)
+                self._logger.warn(msg)
+                return False, msg
         try:
             success, msg = self.ensure_arm_power_and_stand()
             if not success:
                 self._logger.info(msg)
                 return False, msg
             else:
-                trajectory_point = (
-                    RobotCommandBuilder.create_arm_joint_trajectory_point(
-                        joint_targets[0],
-                        joint_targets[1],
-                        joint_targets[2],
-                        joint_targets[3],
-                        joint_targets[4],
-                        joint_targets[5],
+                points = []
+                for joint_target in joint_targets:
+                    trajectory_point = (
+                        RobotCommandBuilder.create_arm_joint_trajectory_point(
+                            joint_target.positions[0],
+                            joint_target.positions[1],
+                            joint_target.positions[2],
+                            joint_target.positions[3],
+                            joint_target.positions[4],
+                            joint_target.positions[5],
+                        )
                     )
-                )
+                    points.append(trajectory_point)
                 arm_joint_trajectory = arm_command_pb2.ArmJointTrajectory(
-                    points=[trajectory_point]
+                    points=points
                 )
                 arm_command = self.make_arm_trajectory_command(arm_joint_trajectory)
 

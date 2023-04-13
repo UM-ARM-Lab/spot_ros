@@ -1265,7 +1265,7 @@ class SpotROS:
 
     def handle_arm_joint_move(self, srv_data: ArmJointMovementRequest):
         """ROS service handler to send joint movement to the arm to execute"""
-        resp = self.spot_wrapper.arm_joint_move(joint_targets=srv_data.joint_target)
+        resp = self.spot_wrapper.arm_joint_move(joint_targets=srv_data.joint_targets)
         return ArmJointMovementResponse(resp[0], resp[1])
 
     def handle_force_trajectory(self, srv_data: ArmForceTrajectoryRequest):
